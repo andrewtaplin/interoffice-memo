@@ -7,7 +7,6 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
 <script>
-// Ensure zoom plugin is registered
 if (typeof Chart !== 'undefined' && typeof ChartZoom !== 'undefined') {
   Chart.register(ChartZoom);
 } else if (typeof Chart !== 'undefined' && window.ChartZoom) {
@@ -110,12 +109,69 @@ if (typeof Chart !== 'undefined' && typeof ChartZoom !== 'undefined') {
   }
   button:hover { opacity: 0.9; }
   .footer { color: var(--muted); font-size: 0.8rem; margin-top: 32px; }
+
+  /* Workspace styles */
+  #workspace {
+    height: calc(100vh - 120px);
+    border: 1px solid #2d3a4d;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+  }
+  .pane {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--bg);
+  }
+  .pane-header {
+    display: flex;
+    gap: 6px;
+    padding: 6px 8px;
+    background: #1a2332;
+    border-bottom: 1px solid #2d3a4d;
+    flex-shrink: 0;
+  }
+  .pane-header input {
+    flex: 1;
+    background: #0f1419;
+    color: var(--text);
+    border: 1px solid #2d3a4d;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.85rem;
+  }
+  .pane-header button {
+    padding: 4px 8px;
+    font-size: 0.8rem;
+  }
+  .pane iframe {
+    flex: 1;
+    border: none;
+    width: 100%;
+    background: #000;
+  }
+  .split-container {
+    display: flex;
+    height: 100%;
+    width: 100%;
+  }
+  .split-container.vertical { flex-direction: row; }
+  .split-container.horizontal { flex-direction: column; }
+  .resizer {
+    background: #2d3a4d;
+    flex-shrink: 0;
+  }
+  .split-container.vertical > .resizer { width: 6px; cursor: col-resize; }
+  .split-container.horizontal > .resizer { height: 6px; cursor: row-resize; }
+  .resizer:hover { background: var(--accent); }
 </style>
 </head>
 <body>
 <div class="tabs">
   <button class="tab active" onclick="switchTab('vtol')">VTOL</button>
   <button class="tab" onclick="switchTab('cyber')">Cyber / AI Governance</button>
+  <button class="tab" onclick="switchTab('workspace')">Workspace</button>
 </div>
 
 <!-- VTOL Content -->
@@ -190,6 +246,14 @@ if (typeof Chart !== 'undefined' && typeof ChartZoom !== 'undefined') {
   </div>
 </div>
 
+<!-- Workspace Content -->
+<div id="content-workspace" class="tab-content">
+  <div style="margin-bottom:12px;color:var(--muted);font-size:0.9rem;">
+    Workspace: split panes vertically or horizontally, then load any URL into each pane. Layout is saved in this browser.
+  </div>
+  <div id="workspace"></div>
+</div>
+
 <div class="footer">
   Data via Yahoo Finance (delayed ~15 min). Auto-refreshes every 15 minutes while this tab is open.<br>
   Index line: blue by default, light green above 9D EMA, brighter green above both 9D & 21D EMAs.<br>
@@ -202,7 +266,6 @@ const PROXY = 'https://proxy.cors.dev/';
 const BASE = 'https://query1.finance.yahoo.com/v8/finance/chart/';
 
 const DESCRIPTIONS = {
-  // VTOL
   JOBY: "Develops all-electric VTOL air taxis for urban air mobility, with partnerships including Toyota and Delta Air Lines, and progress toward commercial certification.",
   ACHR: "Builds the Midnight eVTOL aircraft for short-range urban air taxi services, having achieved full FAA means of compliance acceptance and acquired Boeing’s Wisk assets.",
   BETA: "Designs the ALIA eVTOL and fixed-wing electric aircraft targeting cargo, medical transport, and passenger operations, with early FAA special airworthiness certificates.",
@@ -211,7 +274,6 @@ const DESCRIPTIONS = {
   EH: "Chinese eVTOL maker with the CAAC-certified EH216-S autonomous passenger and logistics aircraft already in trial operations.",
   HOVR: "Developing the hybrid-electric Cavorite X7 VTOL aircraft for regional air mobility markets.",
   XTIA: "Aerospace platform company with VTOL concepts and a growing commercial drone solutions business through subsidiaries.",
-  // Cyber / AI Governance
   TENB: "Provides vulnerability management and cyber exposure platforms that help organizations discover, prioritize, and remediate risks across IT and AI environments.",
   NTSK: "Offers a cloud-native SASE and security platform that secures web, cloud, and AI-driven interactions for enterprises.",
   CHKP: "Delivers comprehensive cybersecurity solutions including firewalls, endpoint protection, and AI-powered threat prevention and governance.",
@@ -360,7 +422,7 @@ function computeReturns(points, currentPrice) {
   const ytdStart = new Date(now.getFullYear(), 0, 1).getTime() / 1000;
   const ytdPoint = sorted.find(p => p.t >= ytdStart) || sorted[0];
   return {
-    d: null, // filled from quote
+    d: null,
     w: getPct(5),
     d7: getPct(7),
     d30: getPct(30),
@@ -370,6 +432,7 @@ function computeReturns(points, currentPrice) {
 
 function renderCards(quotes, dailyMap, prefix) {
   const grid = document.getElementById('cards-' + prefix);
+  if (!grid) return;
   grid.innerHTML = quotes.map(q => {
     const chg = q.changePct;
     const rets = computeReturns(dailyMap[q.symbol] || [], q.price);
@@ -394,19 +457,19 @@ function renderCards(quotes, dailyMap, prefix) {
 }
 
 function renderIndex(idx, prefix) {
-  document.getElementById('indexValue-' + prefix).textContent = fmt(idx.value, 2);
-  const el = document.getElementById('indexChange-' + prefix);
-  el.textContent = pct(idx.changePct);
-  el.className = 'index-change ' + cls(idx.changePct);
+  const valEl = document.getElementById('indexValue-' + prefix);
+  const chgEl = document.getElementById('indexChange-' + prefix);
+  if (valEl) valEl.textContent = fmt(idx.value, 2);
+  if (chgEl) {
+    chgEl.textContent = pct(idx.changePct);
+    chgEl.className = 'index-change ' + cls(idx.changePct);
+  }
 }
 
 function updateIndexChart(seriesData, prefix) {
   const { labels, values, ema9, ema21 } = seriesData;
   const canvas = document.getElementById('indexChart-' + prefix);
-  if (!canvas || !labels.length) {
-    console.warn('No data for index chart', prefix);
-    return;
-  }
+  if (!canvas || !labels.length) return;
 
   try {
     if (charts[prefix].index) charts[prefix].index.destroy();
@@ -481,29 +544,6 @@ function updateIndexChart(seriesData, prefix) {
     });
   } catch (err) {
     console.error('Chart creation failed', err);
-    // Fallback without zoom
-    charts[prefix].index = new Chart(canvas, {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [{
-          label: 'Index',
-          data: values,
-          borderColor: '#58a6ff',
-          tension: 0.15,
-          pointRadius: 0
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { ticks: { color: '#8b9bb4' } },
-          y: { ticks: { color: '#8b9bb4' } }
-        }
-      }
-    });
   }
 }
 
@@ -512,6 +552,7 @@ function updateStocksChart(quotes, prefix) {
   const data = quotes.map(q => q.changePct || 0);
   const colors = data.map(d => d >= 0 ? '#3fb950' : '#f85149');
   const canvas = document.getElementById('stocksChart-' + prefix);
+  if (!canvas) return;
 
   if (charts[prefix].stocks) charts[prefix].stocks.destroy();
   charts[prefix].stocks = new Chart(canvas, {
@@ -538,6 +579,7 @@ function updateStocksChart(quotes, prefix) {
 
 async function refreshAll(prefix) {
   const cfg = configs[prefix];
+  if (!cfg) return;
   const range = currentRange[prefix] || '1y';
   const status = document.getElementById('status-' + prefix);
   if (status) status.textContent = 'Fetching…';
@@ -550,13 +592,11 @@ async function refreshAll(prefix) {
 
     const quotes = quoteResults.filter(r => r.status === 'fulfilled').map(r => r.value);
     const rangeQuotes = rangeResults.filter(r => r.status === 'fulfilled').map(r => r.value);
-    const yearQuotes = yearResults.filter(r => r.status === 'fulfilled').map(r => r.value);
 
     const failed = quoteResults.filter(r => r.status === 'rejected').length +
                    rangeResults.filter(r => r.status === 'rejected').length;
     if (!quotes.length) throw new Error('No quote data returned');
 
-    // Map daily for returns
     const dailyMap = {};
     cfg.tickers.forEach((sym, i) => {
       if (yearResults[i] && yearResults[i].status === 'fulfilled') dailyMap[sym] = yearResults[i].value;
@@ -593,14 +633,168 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
   document.getElementById('content-' + tab).classList.add('active');
-  // Refresh on switch if desired (optional; data may already be loaded)
-  refreshAll(tab);
+  if (tab === 'workspace') initWorkspace();
+  else if (tab !== 'workspace') refreshAll(tab);
 }
 
-// Initial load both, then interval refreshes current
+// ---------- Workspace / Split Pane System ----------
+let paneId = 0;
+function createPane(url = '') {
+  const id = 'pane-' + (++paneId);
+  const div = document.createElement('div');
+  div.className = 'pane';
+  div.dataset.id = id;
+  div.innerHTML = `
+    <div class="pane-header">
+      <input type="text" placeholder="Enter URL and press Enter or Load" value="${url}" onkeydown="if(event.key==='Enter') loadUrl(this)">
+      <button onclick="loadUrl(this.previousElementSibling)">Load</button>
+      <button onclick="splitPane(this, 'vertical')">Split V</button>
+      <button onclick="splitPane(this, 'horizontal')">Split H</button>
+      <button onclick="closePane(this)" style="background:#f85149;color:#fff;">×</button>
+    </div>
+    <iframe src="${url || 'about:blank'}"></iframe>
+  `;
+  return div;
+}
+
+function loadUrl(input) {
+  const url = input.value.trim();
+  const iframe = input.closest('.pane').querySelector('iframe');
+  if (iframe && url) iframe.src = url;
+  saveWorkspace();
+}
+
+function splitPane(btn, direction) {
+  const pane = btn.closest('.pane');
+  const parent = pane.parentElement;
+  const container = document.createElement('div');
+  container.className = 'split-container ' + direction;
+  container.style.flex = pane.style.flex || '1';
+
+  const newPane = createPane();
+  const resizer = document.createElement('div');
+  resizer.className = 'resizer';
+  resizer.onmousedown = startResize;
+
+  if (direction === 'vertical') {
+    pane.style.flex = '1';
+    newPane.style.flex = '1';
+    container.appendChild(pane);
+    container.appendChild(resizer);
+    container.appendChild(newPane);
+  } else {
+    pane.style.flex = '1';
+    newPane.style.flex = '1';
+    container.appendChild(pane);
+    container.appendChild(resizer);
+    container.appendChild(newPane);
+  }
+
+  parent.replaceChild(container, pane);
+  saveWorkspace();
+}
+
+function closePane(btn) {
+  const pane = btn.closest('.pane');
+  const parent = pane.parentElement;
+  if (parent.classList.contains('split-container')) {
+    const sibling = Array.from(parent.children).find(c => c !== pane && c.classList.contains('pane') || c.classList.contains('split-container'));
+    if (sibling) {
+      parent.parentElement.replaceChild(sibling, parent);
+    } else {
+      parent.remove();
+    }
+  } else {
+    pane.remove();
+    if (!document.querySelector('#workspace .pane')) {
+      document.getElementById('workspace').appendChild(createPane());
+    }
+  }
+  saveWorkspace();
+}
+
+let resizing = null;
+function startResize(e) {
+  e.preventDefault();
+  resizing = {
+    resizer: e.target,
+    container: e.target.parentElement,
+    startX: e.clientX,
+    startY: e.clientY,
+    isVertical: e.target.parentElement.classList.contains('vertical')
+  };
+  document.addEventListener('mousemove', doResize);
+  document.addEventListener('mouseup', stopResize);
+}
+
+function doResize(e) {
+  if (!resizing) return;
+  const container = resizing.container;
+  const children = Array.from(container.children);
+  const idx = children.indexOf(resizing.resizer);
+  const prev = children[idx - 1];
+  const next = children[idx + 1];
+  if (!prev || !next) return;
+
+  if (resizing.isVertical) {
+    const total = container.offsetWidth;
+    const delta = e.clientX - resizing.startX;
+    const prevFlex = parseFloat(prev.style.flex || 1);
+    const nextFlex = parseFloat(next.style.flex || 1);
+    const sum = prevFlex + nextFlex;
+    const newPrev = Math.max(0.2, prevFlex + delta / total * sum);
+    prev.style.flex = newPrev;
+    next.style.flex = sum - newPrev;
+    resizing.startX = e.clientX;
+  } else {
+    const total = container.offsetHeight;
+    const delta = e.clientY - resizing.startY;
+    const prevFlex = parseFloat(prev.style.flex || 1);
+    const nextFlex = parseFloat(next.style.flex || 1);
+    const sum = prevFlex + nextFlex;
+    const newPrev = Math.max(0.2, prevFlex + delta / total * sum);
+    prev.style.flex = newPrev;
+    next.style.flex = sum - newPrev;
+    resizing.startY = e.clientY;
+  }
+}
+
+function stopResize() {
+  document.removeEventListener('mousemove', doResize);
+  document.removeEventListener('mouseup', stopResize);
+  resizing = null;
+  saveWorkspace();
+}
+
+function saveWorkspace() {
+  // Simple persistence of URLs only for now
+  const urls = [];
+  document.querySelectorAll('#workspace iframe').forEach(f => urls.push(f.src));
+  localStorage.setItem('iom-workspace-urls', JSON.stringify(urls));
+}
+
+function initWorkspace() {
+  const ws = document.getElementById('workspace');
+  if (ws.children.length) return;
+  const saved = localStorage.getItem('iom-workspace-urls');
+  if (saved) {
+    try {
+      const urls = JSON.parse(saved);
+      if (urls.length) {
+        ws.appendChild(createPane(urls[0]));
+        return;
+      }
+    } catch (e) {}
+  }
+  ws.appendChild(createPane('https://andrewtaplin.github.io/interoffice-memo/'));
+}
+
+// Initial load
 refreshAll('vtol');
 refreshAll('cyber');
-setInterval(() => refreshAll(currentTab), 15 * 60 * 1000);
+setInterval(() => {
+  if (currentTab === 'vtol' || currentTab === 'cyber') refreshAll(currentTab);
+}, 15 * 60 * 1000);
 </script>
 </body>
 </html>
