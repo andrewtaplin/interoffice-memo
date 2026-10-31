@@ -1,1 +1,606 @@
-<!DOCTYPE html><html><head><title>Sub-Industry Indexes</title></head><body><h1>Dashboard loading...</h1><p>Full version will be uploaded next.</p></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sub-Industry Indexes</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+<script>
+// Ensure zoom plugin is registered
+if (typeof Chart !== 'undefined' && typeof ChartZoom !== 'undefined') {
+  Chart.register(ChartZoom);
+} else if (typeof Chart !== 'undefined' && window.ChartZoom) {
+  Chart.register(window.ChartZoom);
+}
+</script>
+<style>
+  :root {
+    --bg: #0f1419;
+    --card: #1a2332;
+    --text: #e6edf3;
+    --muted: #8b9bb4;
+    --green: #3fb950;
+    --red: #f85149;
+    --accent: #58a6ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 20px;
+    line-height: 1.4;
+  }
+  .tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #2d3a4d;
+    padding-bottom: 8px;
+  }
+  .tab {
+    background: transparent;
+    color: var(--muted);
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 1rem;
+  }
+  .tab.active {
+    background: var(--card);
+    color: var(--text);
+  }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  h1 { margin: 0 0 8px; font-size: 1.8rem; }
+  .subtitle { color: var(--muted); margin-bottom: 24px; }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .index-box {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 20px 28px;
+    min-width: 280px;
+  }
+  .index-value { font-size: 2.4rem; font-weight: 700; }
+  .index-change { font-size: 1.2rem; margin-top: 4px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .card h3 { margin: 0 0 8px; font-size: 1.1rem; }
+  .price { font-size: 1.6rem; font-weight: 600; }
+  .change { font-size: 0.95rem; margin-top: 4px; }
+  .meta { color: var(--muted); font-size: 0.8rem; margin-top: 8px; }
+  .positive { color: var(--green); }
+  .negative { color: var(--red); }
+  .chart-container { background: var(--card); border-radius: 12px; padding: 16px; margin-bottom: 24px; }
+  .chart-container canvas { max-height: none !important; height: 520px !important; }
+  #stocksChart-vtol, #stocksChart-cyber { height: 280px !important; }
+  .range-btns { margin-bottom: 8px; }
+  .range-btns button { background: #2d3a4d; color: var(--text); margin-right: 6px; padding: 4px 10px; font-size: 0.85rem; }
+  .range-btns button.active { background: var(--accent); color: #000; }
+  .status { color: var(--muted); font-size: 0.85rem; }
+  .controls { margin-bottom: 16px; }
+  button {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  button:hover { opacity: 0.9; }
+  .footer { color: var(--muted); font-size: 0.8rem; margin-top: 32px; }
+</style>
+</head>
+<body>
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('vtol')">VTOL</button>
+  <button class="tab" onclick="switchTab('cyber')">Cyber / AI Governance</button>
+</div>
+
+<!-- VTOL Content -->
+<div id="content-vtol" class="tab-content active">
+  <div class="header">
+    <div>
+      <h1>eVTOL / VTOL Index</h1>
+      <div class="subtitle">Equal-weighted index of public VTOL / eVTOL aircraft makers</div>
+    </div>
+    <div class="index-box">
+      <div style="color:var(--muted);font-size:0.85rem;">INDEX (base 100)</div>
+      <div class="index-value" id="indexValue-vtol">—</div>
+      <div class="index-change" id="indexChange-vtol">—</div>
+    </div>
+  </div>
+  <div class="controls">
+    <button onclick="refreshAll('vtol')">Refresh Now</button>
+    <span class="status" id="status-vtol">Loading…</span>
+  </div>
+  <div class="chart-container">
+    <h2 style="margin:0 0 8px;font-size:1.1rem;">Index Performance with 9D & 21D EMAs</h2>
+    <div class="range-btns">
+      <button onclick="setRange('vtol','1d')" class="range-btn" data-range="1d">1D</button>
+      <button onclick="setRange('vtol','5d')" class="range-btn" data-range="5d">5D</button>
+      <button onclick="setRange('vtol','1mo')" class="range-btn" data-range="1mo">1M</button>
+      <button onclick="setRange('vtol','3mo')" class="range-btn" data-range="3mo">3M</button>
+      <button onclick="setRange('vtol','6mo')" class="range-btn" data-range="6mo">6M</button>
+      <button onclick="setRange('vtol','1y')" class="range-btn active" data-range="1y">1Y</button>
+    </div>
+    <canvas id="indexChart-vtol"></canvas>
+  </div>
+  <div class="grid" id="cards-vtol"></div>
+  <div class="chart-container">
+    <h2 style="margin:0 0 12px;font-size:1.1rem;">Individual Performance</h2>
+    <canvas id="stocksChart-vtol"></canvas>
+  </div>
+</div>
+
+<!-- Cyber Content -->
+<div id="content-cyber" class="tab-content">
+  <div class="header">
+    <div>
+      <h1>Cyber / AI Governance Index</h1>
+      <div class="subtitle">Equal-weighted index of Cyber / AI Governance stocks</div>
+    </div>
+    <div class="index-box">
+      <div style="color:var(--muted);font-size:0.85rem;">INDEX (base 100)</div>
+      <div class="index-value" id="indexValue-cyber">—</div>
+      <div class="index-change" id="indexChange-cyber">—</div>
+    </div>
+  </div>
+  <div class="controls">
+    <button onclick="refreshAll('cyber')">Refresh Now</button>
+    <span class="status" id="status-cyber">Loading…</span>
+  </div>
+  <div class="chart-container">
+    <h2 style="margin:0 0 8px;font-size:1.1rem;">Index Performance with 9D & 21D EMAs</h2>
+    <div class="range-btns">
+      <button onclick="setRange('cyber','1d')" class="range-btn" data-range="1d">1D</button>
+      <button onclick="setRange('cyber','5d')" class="range-btn" data-range="5d">5D</button>
+      <button onclick="setRange('cyber','1mo')" class="range-btn" data-range="1mo">1M</button>
+      <button onclick="setRange('cyber','3mo')" class="range-btn" data-range="3mo">3M</button>
+      <button onclick="setRange('cyber','6mo')" class="range-btn" data-range="6mo">6M</button>
+      <button onclick="setRange('cyber','1y')" class="range-btn active" data-range="1y">1Y</button>
+    </div>
+    <canvas id="indexChart-cyber"></canvas>
+  </div>
+  <div class="grid" id="cards-cyber"></div>
+  <div class="chart-container">
+    <h2 style="margin:0 0 12px;font-size:1.1rem;">Individual Performance</h2>
+    <canvas id="stocksChart-cyber"></canvas>
+  </div>
+</div>
+
+<div class="footer">
+  Data via Yahoo Finance (delayed ~15 min). Auto-refreshes every 15 minutes while this tab is open.<br>
+  Index line: blue by default, light green above 9D EMA, brighter green above both 9D & 21D EMAs.<br>
+  VTOL tickers: JOBY, ACHR, BETA, EVEX, EVTL, EH, HOVR, XTIA<br>
+  Cyber tickers: TENB, NTSK, CHKP, ZS, RDWR, RBRK, ESTC, S, SAIL, OKTA, FROG, NTNX, CRWD, PANW, SNOW, AKAM, DDOG, NET, NOW, FTNT
+</div>
+
+<script>
+const PROXY = 'https://proxy.cors.dev/';
+const BASE = 'https://query1.finance.yahoo.com/v8/finance/chart/';
+
+const DESCRIPTIONS = {
+  // VTOL
+  JOBY: "Develops all-electric VTOL air taxis for urban air mobility, with partnerships including Toyota and Delta Air Lines, and progress toward commercial certification.",
+  ACHR: "Builds the Midnight eVTOL aircraft for short-range urban air taxi services, having achieved full FAA means of compliance acceptance and acquired Boeing’s Wisk assets.",
+  BETA: "Designs the ALIA eVTOL and fixed-wing electric aircraft targeting cargo, medical transport, and passenger operations, with early FAA special airworthiness certificates.",
+  EVEX: "Embraer-backed developer of eVTOL aircraft focused on urban air mobility and air taxi applications.",
+  EVTL: "UK-based Vertical Aerospace is developing the VX4 piloted eVTOL air taxi for commercial passenger service.",
+  EH: "Chinese eVTOL maker with the CAAC-certified EH216-S autonomous passenger and logistics aircraft already in trial operations.",
+  HOVR: "Developing the hybrid-electric Cavorite X7 VTOL aircraft for regional air mobility markets.",
+  XTIA: "Aerospace platform company with VTOL concepts and a growing commercial drone solutions business through subsidiaries.",
+  // Cyber / AI Governance
+  TENB: "Provides vulnerability management and cyber exposure platforms that help organizations discover, prioritize, and remediate risks across IT and AI environments.",
+  NTSK: "Offers a cloud-native SASE and security platform that secures web, cloud, and AI-driven interactions for enterprises.",
+  CHKP: "Delivers comprehensive cybersecurity solutions including firewalls, endpoint protection, and AI-powered threat prevention and governance.",
+  ZS: "Zero Trust Exchange platform securing user, workload, and AI access to applications and data in the cloud.",
+  RDWR: "Specializes in application delivery, DDoS protection, and network security solutions that protect digital infrastructure and AI services.",
+  RBRK: "Data security and cyber recovery platform that protects, recovers, and governs enterprise data including AI training datasets.",
+  ESTC: "Search, observability, and security analytics platform used to monitor, detect threats, and govern data and AI workloads.",
+  S: "Autonomous AI-powered endpoint security platform that detects, prevents, and responds to threats in real time.",
+  SAIL: "Identity security and governance platform that manages access, entitlements, and compliance for users and AI agents.",
+  OKTA: "Leading identity and access management provider enabling secure authentication and governance for workforce, customer, and AI identities.",
+  FROG: "DevOps and software supply chain platform with security features that help govern AI-generated code and artifacts.",
+  NTNX: "Hybrid multicloud infrastructure platform with built-in security and data services supporting AI and regulated workloads.",
+  CRWD: "Cloud-native cybersecurity platform using AI to protect endpoints, cloud workloads, and identity across the enterprise.",
+  PANW: "Broad cybersecurity platform (Prisma, Cortex) providing network, cloud, and AI security with governance capabilities.",
+  SNOW: "Data cloud platform that enables secure data sharing, analytics, and AI governance with built-in security and access controls.",
+  AKAM: "Edge security and delivery platform offering Zero Trust, API security, and protection for AI-powered applications.",
+  DDOG: "Observability and security monitoring platform that provides visibility and threat detection for cloud and AI infrastructure.",
+  NET: "Global edge network delivering security, performance, and Zero Trust services that protect and govern AI and web traffic.",
+  NOW: "Workflow and AI platform with security operations, risk management, and governance tools for enterprise IT and cyber processes.",
+  FTNT: "Network security leader providing firewalls, SD-WAN, and a security fabric that includes AI-driven threat detection and governance."
+};
+
+const configs = {
+  vtol: {
+    tickers: ['JOBY','ACHR','BETA','EVEX','EVTL','EH','HOVR','XTIA'],
+    prefix: 'vtol'
+  },
+  cyber: {
+    tickers: ['TENB','NTSK','CHKP','ZS','RDWR','RBRK','ESTC','S','SAIL','OKTA','FROG','NTNX','CRWD','PANW','SNOW','AKAM','DDOG','NET','NOW','FTNT'],
+    prefix: 'cyber'
+  }
+};
+
+const charts = { vtol: {}, cyber: {} };
+let currentTab = 'vtol';
+const currentRange = { vtol: '1y', cyber: '1y' };
+
+function fmt(n, d=2) { return n == null ? '—' : n.toFixed(d); }
+function pct(n) { return n == null ? '—' : (n >= 0 ? '+' : '') + n.toFixed(2) + '%'; }
+function cls(n) { return n >= 0 ? 'positive' : 'negative'; }
+
+async function fetchQuote(symbol) {
+  const url = `${PROXY}${BASE}${encodeURIComponent(symbol)}?range=1d&interval=5m&includePrePost=false`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(symbol + ' ' + r.status);
+  const j = await r.json();
+  const result = j.chart?.result?.[0];
+  if (!result) throw new Error(symbol + ' no data');
+  const meta = result.meta;
+  const timestamps = result.timestamp || [];
+  const closes = result.indicators?.quote?.[0]?.close || [];
+  const points = timestamps.map((t,i) => ({ t, c: closes[i] })).filter(p => p.c != null);
+  return {
+    symbol,
+    price: meta.regularMarketPrice,
+    prev: meta.chartPreviousClose || meta.previousClose,
+    change: meta.regularMarketChange,
+    changePct: meta.regularMarketChangePercent,
+    volume: meta.regularMarketVolume,
+    name: meta.shortName || meta.longName || symbol,
+    points
+  };
+}
+
+async function fetchDaily(symbol, range = '1y') {
+  const interval = (range === '1d' || range === '5d') ? '5m' : '1d';
+  const url = `${PROXY}${BASE}${encodeURIComponent(symbol)}?range=${range}&interval=${interval}&includePrePost=false`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(symbol + ' ' + range + ' ' + r.status);
+  const j = await r.json();
+  const result = j.chart?.result?.[0];
+  if (!result) throw new Error(symbol + ' no data for ' + range);
+  const timestamps = result.timestamp || [];
+  const closes = result.indicators?.quote?.[0]?.close || [];
+  return timestamps.map((t, i) => ({ t, c: closes[i] })).filter(p => p.c != null);
+}
+
+function calculateEMA(data, period) {
+  if (data.length < period) return Array(data.length).fill(null);
+  const k = 2 / (period + 1);
+  const ema = Array(data.length).fill(null);
+  let sum = 0;
+  for (let i = 0; i < period; i++) sum += data[i];
+  ema[period - 1] = sum / period;
+  for (let i = period; i < data.length; i++) {
+    ema[i] = data[i] * k + ema[i - 1] * (1 - k);
+  }
+  return ema;
+}
+
+function buildIndexSeries(dailyQuotes, range) {
+  const isIntraday = range === '1d' || range === '5d';
+  const dayMap = new Map();
+  dailyQuotes.forEach(q => {
+    q.forEach(p => {
+      const key = isIntraday ? p.t : Math.floor(p.t / 86400) * 86400;
+      if (!dayMap.has(key)) dayMap.set(key, []);
+      dayMap.get(key).push(p.c);
+    });
+  });
+  const times = [...dayMap.keys()].sort((a, b) => a - b);
+  if (times.length < 2) return { labels: [], values: [], ema9: [], ema21: [] };
+
+  const firstCloses = dailyQuotes.map(q => q.find(p => p.c != null)?.c || 1);
+  const series = times.map(time => {
+    let sum = 0, n = 0;
+    dailyQuotes.forEach((q, idx) => {
+      const p = q.find(x => (isIntraday ? x.t : Math.floor(x.t / 86400) * 86400) === time);
+      if (p && firstCloses[idx]) {
+        sum += (p.c / firstCloses[idx]) * 100;
+        n++;
+      }
+    });
+    return n ? sum / n : null;
+  });
+
+  const validSeries = series.map(v => v || series.find(x => x != null) || 100);
+  const ema9 = isIntraday ? Array(validSeries.length).fill(null) : calculateEMA(validSeries, 9);
+  const ema21 = isIntraday ? Array(validSeries.length).fill(null) : calculateEMA(validSeries, 21);
+  const labels = times.map(t => {
+    const d = new Date(t * 1000);
+    return isIntraday
+      ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  });
+
+  return { labels, values: series, ema9, ema21 };
+}
+
+function calcIndex(quotes) {
+  const ratios = quotes.map(q => q.prev ? q.price / q.prev : 1);
+  const avg = ratios.reduce((a,b)=>a+b,0) / ratios.length;
+  return { value: avg * 100, changePct: (avg - 1) * 100 };
+}
+
+function computeReturns(points, currentPrice) {
+  if (!points || !points.length || !currentPrice) return {};
+  const sorted = [...points].sort((a, b) => a.t - b.t);
+  const last = sorted[sorted.length - 1];
+  const getPct = (daysBack) => {
+    const cutoff = last.t - daysBack * 86400;
+    const past = sorted.find(p => p.t >= cutoff) || sorted[0];
+    return past && past.c ? ((currentPrice / past.c) - 1) * 100 : null;
+  };
+  const now = new Date();
+  const ytdStart = new Date(now.getFullYear(), 0, 1).getTime() / 1000;
+  const ytdPoint = sorted.find(p => p.t >= ytdStart) || sorted[0];
+  return {
+    d: null, // filled from quote
+    w: getPct(5),
+    d7: getPct(7),
+    d30: getPct(30),
+    ytd: ytdPoint && ytdPoint.c ? ((currentPrice / ytdPoint.c) - 1) * 100 : null
+  };
+}
+
+function renderCards(quotes, dailyMap, prefix) {
+  const grid = document.getElementById('cards-' + prefix);
+  grid.innerHTML = quotes.map(q => {
+    const chg = q.changePct;
+    const rets = computeReturns(dailyMap[q.symbol] || [], q.price);
+    rets.d = chg;
+    const desc = DESCRIPTIONS[q.symbol] || '';
+    return `
+      <div class="card">
+        <h3>${q.symbol} <span style="color:var(--muted);font-weight:400;font-size:0.85rem">${q.name}</span></h3>
+        <div style="color:var(--muted);font-size:0.8rem;margin:4px 0 8px;line-height:1.3">${desc}</div>
+        <div class="price">${fmt(q.price)}</div>
+        <div class="change ${cls(chg)}">${pct(chg)} (${fmt(q.change)})</div>
+        <div class="meta" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">
+          <span class="${cls(rets.d)}">D% ${pct(rets.d)}</span>
+          <span class="${cls(rets.w)}">W% ${pct(rets.w)}</span>
+          <span class="${cls(rets.d7)}">7D% ${pct(rets.d7)}</span>
+          <span class="${cls(rets.d30)}">30D% ${pct(rets.d30)}</span>
+          <span class="${cls(rets.ytd)}">YTD% ${pct(rets.ytd)}</span>
+        </div>
+        <div class="meta">Prev: ${fmt(q.prev)} · Vol: ${q.volume ? (q.volume/1e6).toFixed(1)+'M' : '—'}</div>
+      </div>`;
+  }).join('');
+}
+
+function renderIndex(idx, prefix) {
+  document.getElementById('indexValue-' + prefix).textContent = fmt(idx.value, 2);
+  const el = document.getElementById('indexChange-' + prefix);
+  el.textContent = pct(idx.changePct);
+  el.className = 'index-change ' + cls(idx.changePct);
+}
+
+function updateIndexChart(seriesData, prefix) {
+  const { labels, values, ema9, ema21 } = seriesData;
+  const canvas = document.getElementById('indexChart-' + prefix);
+  if (!canvas || !labels.length) {
+    console.warn('No data for index chart', prefix);
+    return;
+  }
+
+  try {
+    if (charts[prefix].index) charts[prefix].index.destroy();
+    charts[prefix].index = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Index',
+            data: values,
+            borderColor: '#58a6ff',
+            backgroundColor: 'rgba(88,166,255,0.08)',
+            tension: 0.15,
+            fill: false,
+            pointRadius: 0,
+            borderWidth: 2.5,
+            segment: {
+              borderColor: ctx => {
+                const i = ctx.p0DataIndex;
+                const v = values[i];
+                const e9 = ema9[i];
+                const e21 = ema21[i];
+                if (v == null || e9 == null) return '#58a6ff';
+                if (v > e9 && (e21 == null || v > e21)) return '#3fb950';
+                if (v > e9) return '#7ee787';
+                return '#58a6ff';
+              }
+            }
+          },
+          {
+            label: '9D EMA',
+            data: ema9,
+            borderColor: '#f0c14b',
+            borderWidth: 1.5,
+            borderDash: [4, 4],
+            pointRadius: 0,
+            fill: false
+          },
+          {
+            label: '21D EMA',
+            data: ema21,
+            borderColor: '#d29922',
+            borderWidth: 1.5,
+            borderDash: [6, 3],
+            pointRadius: 0,
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: true, labels: { color: '#8b9bb4' } },
+          tooltip: { mode: 'index', intersect: false },
+          zoom: {
+            pan: { enabled: true, mode: 'x' },
+            zoom: {
+              wheel: { enabled: true },
+              pinch: { enabled: true },
+              mode: 'x'
+            }
+          }
+        },
+        scales: {
+          x: { ticks: { color: '#8b9bb4', maxTicksLimit: 12 } },
+          y: { ticks: { color: '#8b9bb4' } }
+        },
+        interaction: { mode: 'nearest', axis: 'x', intersect: false }
+      }
+    });
+  } catch (err) {
+    console.error('Chart creation failed', err);
+    // Fallback without zoom
+    charts[prefix].index = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Index',
+          data: values,
+          borderColor: '#58a6ff',
+          tension: 0.15,
+          pointRadius: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#8b9bb4' } },
+          y: { ticks: { color: '#8b9bb4' } }
+        }
+      }
+    });
+  }
+}
+
+function updateStocksChart(quotes, prefix) {
+  const labels = quotes.map(q => q.symbol);
+  const data = quotes.map(q => q.changePct || 0);
+  const colors = data.map(d => d >= 0 ? '#3fb950' : '#f85149');
+  const canvas = document.getElementById('stocksChart-' + prefix);
+
+  if (charts[prefix].stocks) charts[prefix].stocks.destroy();
+  charts[prefix].stocks = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: '% Change',
+        data,
+        backgroundColor: colors
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { color: '#8b9bb4' } },
+        x: { ticks: { color: '#e6edf3' } }
+      }
+    }
+  });
+}
+
+async function refreshAll(prefix) {
+  const cfg = configs[prefix];
+  const range = currentRange[prefix] || '1y';
+  const status = document.getElementById('status-' + prefix);
+  if (status) status.textContent = 'Fetching…';
+  try {
+    const [quoteResults, rangeResults, yearResults] = await Promise.all([
+      Promise.allSettled(cfg.tickers.map(fetchQuote)),
+      Promise.allSettled(cfg.tickers.map(s => fetchDaily(s, range))),
+      Promise.allSettled(cfg.tickers.map(s => fetchDaily(s, '1y')))
+    ]);
+
+    const quotes = quoteResults.filter(r => r.status === 'fulfilled').map(r => r.value);
+    const rangeQuotes = rangeResults.filter(r => r.status === 'fulfilled').map(r => r.value);
+    const yearQuotes = yearResults.filter(r => r.status === 'fulfilled').map(r => r.value);
+
+    const failed = quoteResults.filter(r => r.status === 'rejected').length +
+                   rangeResults.filter(r => r.status === 'rejected').length;
+    if (!quotes.length) throw new Error('No quote data returned');
+
+    // Map daily for returns
+    const dailyMap = {};
+    cfg.tickers.forEach((sym, i) => {
+      if (yearResults[i] && yearResults[i].status === 'fulfilled') dailyMap[sym] = yearResults[i].value;
+    });
+
+    const idx = calcIndex(quotes);
+    renderIndex(idx, prefix);
+    renderCards(quotes, dailyMap, prefix);
+    if (rangeQuotes.length) {
+      const seriesData = buildIndexSeries(rangeQuotes, range);
+      updateIndexChart(seriesData, prefix);
+    }
+    updateStocksChart(quotes, prefix);
+
+    const now = new Date().toLocaleTimeString();
+    if (status) status.textContent = `Updated ${now}${failed ? ` (${failed} failed)` : ''}`;
+  } catch (e) {
+    console.error('refreshAll error', e);
+    if (status) status.textContent = 'Error: ' + (e.message || e);
+  }
+}
+
+function setRange(prefix, range) {
+  currentRange[prefix] = range;
+  document.querySelectorAll(`#content-${prefix} .range-btn`).forEach(b => {
+    b.classList.toggle('active', b.dataset.range === range);
+  });
+  refreshAll(prefix);
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
+  document.getElementById('content-' + tab).classList.add('active');
+  // Refresh on switch if desired (optional; data may already be loaded)
+  refreshAll(tab);
+}
+
+// Initial load both, then interval refreshes current
+refreshAll('vtol');
+refreshAll('cyber');
+setInterval(() => refreshAll(currentTab), 15 * 60 * 1000);
+</script>
+</body>
+</html>
