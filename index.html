@@ -110,27 +110,31 @@ if (typeof Chart !== 'undefined' && typeof ChartZoom !== 'undefined') {
   button:hover { opacity: 0.9; }
   .footer { color: var(--muted); font-size: 0.8rem; margin-top: 32px; }
 
-  /* Workspace styles */
+  /* Workspace */
   #workspace {
-    height: calc(100vh - 120px);
+    height: calc(100vh - 160px);
+    min-height: 500px;
     border: 1px solid #2d3a4d;
     border-radius: 8px;
     overflow: hidden;
-    position: relative;
+    display: flex;
+    flex-direction: column;
   }
   .pane {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    flex: 1;
+    min-height: 200px;
     background: var(--bg);
   }
   .pane-header {
     display: flex;
     gap: 6px;
-    padding: 6px 8px;
+    padding: 8px;
     background: #1a2332;
     border-bottom: 1px solid #2d3a4d;
     flex-shrink: 0;
+    align-items: center;
   }
   .pane-header input {
     flex: 1;
@@ -138,23 +142,25 @@ if (typeof Chart !== 'undefined' && typeof ChartZoom !== 'undefined') {
     color: var(--text);
     border: 1px solid #2d3a4d;
     border-radius: 4px;
-    padding: 4px 8px;
-    font-size: 0.85rem;
+    padding: 6px 8px;
+    font-size: 0.9rem;
   }
   .pane-header button {
-    padding: 4px 8px;
-    font-size: 0.8rem;
+    padding: 6px 10px;
+    font-size: 0.85rem;
+    white-space: nowrap;
   }
   .pane iframe {
     flex: 1;
     border: none;
     width: 100%;
-    background: #000;
+    min-height: 200px;
+    background: #111;
   }
   .split-container {
     display: flex;
-    height: 100%;
-    width: 100%;
+    flex: 1;
+    min-height: 0;
   }
   .split-container.vertical { flex-direction: row; }
   .split-container.horizontal { flex-direction: column; }
@@ -162,8 +168,8 @@ if (typeof Chart !== 'undefined' && typeof ChartZoom !== 'undefined') {
     background: #2d3a4d;
     flex-shrink: 0;
   }
-  .split-container.vertical > .resizer { width: 6px; cursor: col-resize; }
-  .split-container.horizontal > .resizer { height: 6px; cursor: row-resize; }
+  .split-container.vertical > .resizer { width: 8px; cursor: col-resize; }
+  .split-container.horizontal > .resizer { height: 8px; cursor: row-resize; }
   .resizer:hover { background: var(--accent); }
 </style>
 </head>
@@ -174,7 +180,6 @@ if (typeof Chart !== 'undefined' && typeof ChartZoom !== 'undefined') {
   <button class="tab" onclick="switchTab('workspace')">Workspace</button>
 </div>
 
-<!-- VTOL Content -->
 <div id="content-vtol" class="tab-content active">
   <div class="header">
     <div>
@@ -210,7 +215,6 @@ if (typeof Chart !== 'undefined' && typeof ChartZoom !== 'undefined') {
   </div>
 </div>
 
-<!-- Cyber Content -->
 <div id="content-cyber" class="tab-content">
   <div class="header">
     <div>
@@ -246,10 +250,9 @@ if (typeof Chart !== 'undefined' && typeof ChartZoom !== 'undefined') {
   </div>
 </div>
 
-<!-- Workspace Content -->
 <div id="content-workspace" class="tab-content">
   <div style="margin-bottom:12px;color:var(--muted);font-size:0.9rem;">
-    Workspace: split panes vertically or horizontally, then load any URL into each pane. Layout is saved in this browser.
+    Workspace: enter a URL and click Load. Use Split V or Split H to divide the pane. Drag the divider to resize. Layout is saved in this browser.
   </div>
   <div id="workspace"></div>
 </div>
@@ -297,14 +300,8 @@ const DESCRIPTIONS = {
 };
 
 const configs = {
-  vtol: {
-    tickers: ['JOBY','ACHR','BETA','EVEX','EVTL','EH','HOVR','XTIA'],
-    prefix: 'vtol'
-  },
-  cyber: {
-    tickers: ['TENB','NTSK','CHKP','ZS','RDWR','RBRK','ESTC','S','SAIL','OKTA','FROG','NTNX','CRWD','PANW','SNOW','AKAM','DDOG','NET','NOW','FTNT'],
-    prefix: 'cyber'
-  }
+  vtol: { tickers: ['JOBY','ACHR','BETA','EVEX','EVTL','EH','HOVR','XTIA'], prefix: 'vtol' },
+  cyber: { tickers: ['TENB','NTSK','CHKP','ZS','RDWR','RBRK','ESTC','S','SAIL','OKTA','FROG','NTNX','CRWD','PANW','SNOW','AKAM','DDOG','NET','NOW','FTNT'], prefix: 'cyber' }
 };
 
 const charts = { vtol: {}, cyber: {} };
@@ -438,21 +435,7 @@ function renderCards(quotes, dailyMap, prefix) {
     const rets = computeReturns(dailyMap[q.symbol] || [], q.price);
     rets.d = chg;
     const desc = DESCRIPTIONS[q.symbol] || '';
-    return `
-      <div class="card">
-        <h3>${q.symbol} <span style="color:var(--muted);font-weight:400;font-size:0.85rem">${q.name}</span></h3>
-        <div style="color:var(--muted);font-size:0.8rem;margin:4px 0 8px;line-height:1.3">${desc}</div>
-        <div class="price">${fmt(q.price)}</div>
-        <div class="change ${cls(chg)}">${pct(chg)} (${fmt(q.change)})</div>
-        <div class="meta" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">
-          <span class="${cls(rets.d)}">D% ${pct(rets.d)}</span>
-          <span class="${cls(rets.w)}">W% ${pct(rets.w)}</span>
-          <span class="${cls(rets.d7)}">7D% ${pct(rets.d7)}</span>
-          <span class="${cls(rets.d30)}">30D% ${pct(rets.d30)}</span>
-          <span class="${cls(rets.ytd)}">YTD% ${pct(rets.ytd)}</span>
-        </div>
-        <div class="meta">Prev: ${fmt(q.prev)} · Vol: ${q.volume ? (q.volume/1e6).toFixed(1)+'M' : '—'}</div>
-      </div>`;
+    return `<div class="card"><h3>${q.symbol} <span style="color:var(--muted);font-weight:400;font-size:0.85rem">${q.name}</span></h3><div style="color:var(--muted);font-size:0.8rem;margin:4px 0 8px;line-height:1.3">${desc}</div><div class="price">${fmt(q.price)}</div><div class="change ${cls(chg)}">${pct(chg)} (${fmt(q.change)})</div><div class="meta" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;"><span class="${cls(rets.d)}">D% ${pct(rets.d)}</span><span class="${cls(rets.w)}">W% ${pct(rets.w)}</span><span class="${cls(rets.d7)}">7D% ${pct(rets.d7)}</span><span class="${cls(rets.d30)}">30D% ${pct(rets.d30)}</span><span class="${cls(rets.ytd)}">YTD% ${pct(rets.ytd)}</span></div><div class="meta">Prev: ${fmt(q.prev)} · Vol: ${q.volume ? (q.volume/1e6).toFixed(1)+'M' : '—'}</div></div>`;
   }).join('');
 }
 
@@ -470,7 +453,6 @@ function updateIndexChart(seriesData, prefix) {
   const { labels, values, ema9, ema21 } = seriesData;
   const canvas = document.getElementById('indexChart-' + prefix);
   if (!canvas || !labels.length) return;
-
   try {
     if (charts[prefix].index) charts[prefix].index.destroy();
     charts[prefix].index = new Chart(canvas, {
@@ -478,73 +460,23 @@ function updateIndexChart(seriesData, prefix) {
       data: {
         labels,
         datasets: [
-          {
-            label: 'Index',
-            data: values,
-            borderColor: '#58a6ff',
-            backgroundColor: 'rgba(88,166,255,0.08)',
-            tension: 0.15,
-            fill: false,
-            pointRadius: 0,
-            borderWidth: 2.5,
-            segment: {
-              borderColor: ctx => {
-                const i = ctx.p0DataIndex;
-                const v = values[i];
-                const e9 = ema9[i];
-                const e21 = ema21[i];
-                if (v == null || e9 == null) return '#58a6ff';
-                if (v > e9 && (e21 == null || v > e21)) return '#3fb950';
-                if (v > e9) return '#7ee787';
-                return '#58a6ff';
-              }
-            }
+          { label: 'Index', data: values, borderColor: '#58a6ff', tension: 0.15, pointRadius: 0, borderWidth: 2.5,
+            segment: { borderColor: ctx => {
+              const i = ctx.p0DataIndex;
+              const v = values[i], e9 = ema9[i], e21 = ema21[i];
+              if (v == null || e9 == null) return '#58a6ff';
+              if (v > e9 && (e21 == null || v > e21)) return '#3fb950';
+              if (v > e9) return '#7ee787';
+              return '#58a6ff';
+            }}
           },
-          {
-            label: '9D EMA',
-            data: ema9,
-            borderColor: '#f0c14b',
-            borderWidth: 1.5,
-            borderDash: [4, 4],
-            pointRadius: 0,
-            fill: false
-          },
-          {
-            label: '21D EMA',
-            data: ema21,
-            borderColor: '#d29922',
-            borderWidth: 1.5,
-            borderDash: [6, 3],
-            pointRadius: 0,
-            fill: false
-          }
+          { label: '9D EMA', data: ema9, borderColor: '#f0c14b', borderWidth: 1.5, borderDash: [4,4], pointRadius: 0 },
+          { label: '21D EMA', data: ema21, borderColor: '#d29922', borderWidth: 1.5, borderDash: [6,3], pointRadius: 0 }
         ]
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: true, labels: { color: '#8b9bb4' } },
-          tooltip: { mode: 'index', intersect: false },
-          zoom: {
-            pan: { enabled: true, mode: 'x' },
-            zoom: {
-              wheel: { enabled: true },
-              pinch: { enabled: true },
-              mode: 'x'
-            }
-          }
-        },
-        scales: {
-          x: { ticks: { color: '#8b9bb4', maxTicksLimit: 12 } },
-          y: { ticks: { color: '#8b9bb4' } }
-        },
-        interaction: { mode: 'nearest', axis: 'x', intersect: false }
-      }
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8b9bb4' } }, zoom: { pan: { enabled: true, mode: 'x' }, zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' } } }, scales: { x: { ticks: { color: '#8b9bb4', maxTicksLimit: 12 } }, y: { ticks: { color: '#8b9bb4' } } } }
     });
-  } catch (err) {
-    console.error('Chart creation failed', err);
-  }
+  } catch (err) { console.error(err); }
 }
 
 function updateStocksChart(quotes, prefix) {
@@ -553,27 +485,11 @@ function updateStocksChart(quotes, prefix) {
   const colors = data.map(d => d >= 0 ? '#3fb950' : '#f85149');
   const canvas = document.getElementById('stocksChart-' + prefix);
   if (!canvas) return;
-
   if (charts[prefix].stocks) charts[prefix].stocks.destroy();
   charts[prefix].stocks = new Chart(canvas, {
     type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        label: '% Change',
-        data,
-        backgroundColor: colors
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        y: { ticks: { color: '#8b9bb4' } },
-        x: { ticks: { color: '#e6edf3' } }
-      }
-    }
+    data: { labels, datasets: [{ data, backgroundColor: colors }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { color: '#8b9bb4' } }, x: { ticks: { color: '#e6edf3' } } } }
   });
 }
 
@@ -589,41 +505,27 @@ async function refreshAll(prefix) {
       Promise.allSettled(cfg.tickers.map(s => fetchDaily(s, range))),
       Promise.allSettled(cfg.tickers.map(s => fetchDaily(s, '1y')))
     ]);
-
     const quotes = quoteResults.filter(r => r.status === 'fulfilled').map(r => r.value);
     const rangeQuotes = rangeResults.filter(r => r.status === 'fulfilled').map(r => r.value);
-
-    const failed = quoteResults.filter(r => r.status === 'rejected').length +
-                   rangeResults.filter(r => r.status === 'rejected').length;
+    const failed = quoteResults.filter(r => r.status === 'rejected').length + rangeResults.filter(r => r.status === 'rejected').length;
     if (!quotes.length) throw new Error('No quote data returned');
-
     const dailyMap = {};
-    cfg.tickers.forEach((sym, i) => {
-      if (yearResults[i] && yearResults[i].status === 'fulfilled') dailyMap[sym] = yearResults[i].value;
-    });
-
+    cfg.tickers.forEach((sym, i) => { if (yearResults[i] && yearResults[i].status === 'fulfilled') dailyMap[sym] = yearResults[i].value; });
     const idx = calcIndex(quotes);
     renderIndex(idx, prefix);
     renderCards(quotes, dailyMap, prefix);
-    if (rangeQuotes.length) {
-      const seriesData = buildIndexSeries(rangeQuotes, range);
-      updateIndexChart(seriesData, prefix);
-    }
+    if (rangeQuotes.length) updateIndexChart(buildIndexSeries(rangeQuotes, range), prefix);
     updateStocksChart(quotes, prefix);
-
-    const now = new Date().toLocaleTimeString();
-    if (status) status.textContent = `Updated ${now}${failed ? ` (${failed} failed)` : ''}`;
+    if (status) status.textContent = `Updated ${new Date().toLocaleTimeString()}${failed ? ` (${failed} failed)` : ''}`;
   } catch (e) {
-    console.error('refreshAll error', e);
+    console.error(e);
     if (status) status.textContent = 'Error: ' + (e.message || e);
   }
 }
 
 function setRange(prefix, range) {
   currentRange[prefix] = range;
-  document.querySelectorAll(`#content-${prefix} .range-btn`).forEach(b => {
-    b.classList.toggle('active', b.dataset.range === range);
-  });
+  document.querySelectorAll(`#content-${prefix} .range-btn`).forEach(b => b.classList.toggle('active', b.dataset.range === range));
   refreshAll(prefix);
 }
 
@@ -631,13 +533,18 @@ function switchTab(tab) {
   currentTab = tab;
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-  document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
-  document.getElementById('content-' + tab).classList.add('active');
-  if (tab === 'workspace') initWorkspace();
-  else if (tab !== 'workspace') refreshAll(tab);
+  const btn = document.querySelector(`.tab[onclick="switchTab('${tab}')"]`);
+  if (btn) btn.classList.add('active');
+  const content = document.getElementById('content-' + tab);
+  if (content) content.classList.add('active');
+  if (tab === 'workspace') {
+    setTimeout(initWorkspace, 50);
+  } else if (tab === 'vtol' || tab === 'cyber') {
+    refreshAll(tab);
+  }
 }
 
-// ---------- Workspace / Split Pane System ----------
+// ---------- Workspace ----------
 let paneId = 0;
 function createPane(url = '') {
   const id = 'pane-' + (++paneId);
@@ -646,7 +553,7 @@ function createPane(url = '') {
   div.dataset.id = id;
   div.innerHTML = `
     <div class="pane-header">
-      <input type="text" placeholder="Enter URL and press Enter or Load" value="${url}" onkeydown="if(event.key==='Enter') loadUrl(this)">
+      <input type="text" placeholder="https://..." value="${url.replace(/"/g, '"')}" onkeydown="if(event.key==='Enter') loadUrl(this)">
       <button onclick="loadUrl(this.previousElementSibling)">Load</button>
       <button onclick="splitPane(this, 'vertical')">Split V</button>
       <button onclick="splitPane(this, 'horizontal')">Split H</button>
@@ -658,9 +565,12 @@ function createPane(url = '') {
 }
 
 function loadUrl(input) {
-  const url = input.value.trim();
+  let url = input.value.trim();
+  if (!url) return;
+  if (!url.startsWith('http')) url = 'https://' + url;
   const iframe = input.closest('.pane').querySelector('iframe');
-  if (iframe && url) iframe.src = url;
+  if (iframe) iframe.src = url;
+  input.value = url;
   saveWorkspace();
 }
 
@@ -669,45 +579,41 @@ function splitPane(btn, direction) {
   const parent = pane.parentElement;
   const container = document.createElement('div');
   container.className = 'split-container ' + direction;
-  container.style.flex = pane.style.flex || '1';
+  container.style.flex = '1';
 
   const newPane = createPane();
   const resizer = document.createElement('div');
   resizer.className = 'resizer';
   resizer.onmousedown = startResize;
 
-  if (direction === 'vertical') {
-    pane.style.flex = '1';
-    newPane.style.flex = '1';
-    container.appendChild(pane);
-    container.appendChild(resizer);
-    container.appendChild(newPane);
-  } else {
-    pane.style.flex = '1';
-    newPane.style.flex = '1';
-    container.appendChild(pane);
-    container.appendChild(resizer);
-    container.appendChild(newPane);
-  }
+  pane.style.flex = '1';
+  newPane.style.flex = '1';
+  container.appendChild(pane);
+  container.appendChild(resizer);
+  container.appendChild(newPane);
 
-  parent.replaceChild(container, pane);
+  if (parent === document.getElementById('workspace')) {
+    parent.innerHTML = '';
+    parent.appendChild(container);
+  } else {
+    parent.replaceChild(container, pane);
+  }
   saveWorkspace();
 }
 
 function closePane(btn) {
   const pane = btn.closest('.pane');
   const parent = pane.parentElement;
-  if (parent.classList.contains('split-container')) {
-    const sibling = Array.from(parent.children).find(c => c !== pane && c.classList.contains('pane') || c.classList.contains('split-container'));
-    if (sibling) {
-      parent.parentElement.replaceChild(sibling, parent);
+  if (parent.id === 'workspace') {
+    pane.remove();
+    if (!parent.querySelector('.pane')) parent.appendChild(createPane());
+  } else if (parent.classList.contains('split-container')) {
+    const grand = parent.parentElement;
+    const sibling = Array.from(parent.children).find(c => c !== pane && !c.classList.contains('resizer'));
+    if (sibling && grand) {
+      grand.replaceChild(sibling, parent);
     } else {
       parent.remove();
-    }
-  } else {
-    pane.remove();
-    if (!document.querySelector('#workspace .pane')) {
-      document.getElementById('workspace').appendChild(createPane());
     }
   }
   saveWorkspace();
@@ -726,7 +632,6 @@ function startResize(e) {
   document.addEventListener('mousemove', doResize);
   document.addEventListener('mouseup', stopResize);
 }
-
 function doResize(e) {
   if (!resizing) return;
   const container = resizing.container;
@@ -735,30 +640,28 @@ function doResize(e) {
   const prev = children[idx - 1];
   const next = children[idx + 1];
   if (!prev || !next) return;
-
   if (resizing.isVertical) {
-    const total = container.offsetWidth;
+    const total = container.offsetWidth || 1;
     const delta = e.clientX - resizing.startX;
     const prevFlex = parseFloat(prev.style.flex || 1);
     const nextFlex = parseFloat(next.style.flex || 1);
     const sum = prevFlex + nextFlex;
-    const newPrev = Math.max(0.2, prevFlex + delta / total * sum);
+    const newPrev = Math.max(0.15, Math.min(sum - 0.15, prevFlex + delta / total * sum));
     prev.style.flex = newPrev;
     next.style.flex = sum - newPrev;
     resizing.startX = e.clientX;
   } else {
-    const total = container.offsetHeight;
+    const total = container.offsetHeight || 1;
     const delta = e.clientY - resizing.startY;
     const prevFlex = parseFloat(prev.style.flex || 1);
     const nextFlex = parseFloat(next.style.flex || 1);
     const sum = prevFlex + nextFlex;
-    const newPrev = Math.max(0.2, prevFlex + delta / total * sum);
+    const newPrev = Math.max(0.15, Math.min(sum - 0.15, prevFlex + delta / total * sum));
     prev.style.flex = newPrev;
     next.style.flex = sum - newPrev;
     resizing.startY = e.clientY;
   }
 }
-
 function stopResize() {
   document.removeEventListener('mousemove', doResize);
   document.removeEventListener('mouseup', stopResize);
@@ -767,29 +670,28 @@ function stopResize() {
 }
 
 function saveWorkspace() {
-  // Simple persistence of URLs only for now
   const urls = [];
-  document.querySelectorAll('#workspace iframe').forEach(f => urls.push(f.src));
+  document.querySelectorAll('#workspace iframe').forEach(f => {
+    if (f.src && f.src !== 'about:blank') urls.push(f.src);
+  });
   localStorage.setItem('iom-workspace-urls', JSON.stringify(urls));
 }
 
 function initWorkspace() {
   const ws = document.getElementById('workspace');
-  if (ws.children.length) return;
-  const saved = localStorage.getItem('iom-workspace-urls');
-  if (saved) {
-    try {
+  if (!ws) return;
+  if (ws.querySelector('.pane')) return;
+  let url = '';
+  try {
+    const saved = localStorage.getItem('iom-workspace-urls');
+    if (saved) {
       const urls = JSON.parse(saved);
-      if (urls.length) {
-        ws.appendChild(createPane(urls[0]));
-        return;
-      }
-    } catch (e) {}
-  }
-  ws.appendChild(createPane('https://andrewtaplin.github.io/interoffice-memo/'));
+      if (urls && urls[0]) url = urls[0];
+    }
+  } catch (e) {}
+  ws.appendChild(createPane(url));
 }
 
-// Initial load
 refreshAll('vtol');
 refreshAll('cyber');
 setInterval(() => {
